@@ -1,8 +1,21 @@
 # Kaizen
 
+![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+
 Evaluation framework for AI agents. Grade skills, evaluate task quality, run meta-evaluations, and capture failure cases for continuous improvement.
 
 Originally developed as yokay-evals for [pokayokay](https://github.com/stevestomp/pokayokay), now a standalone framework usable by any agentic system.
+
+## Why Kaizen?
+
+AI agents are powerful but inconsistent. Kaizen provides the infrastructure to measure and improve agent reliability:
+
+- **Pre-task gates** - Validate task quality before agents start work
+- **Post-task grading** - Verify implementations meet requirements
+- **Consistency metrics** - Pass^k measures how often agents succeed *every* time, not just sometimes
+- **Failure tracking** - 12 categories of documented failure patterns to learn from
+- **CI/CD integration** - Quality gates for your deployment pipeline
 
 ## Installation
 
@@ -244,6 +257,13 @@ type CodeGrader interface {
     IsApplicable(input GradeInput) bool
 }
 ```
+
+## Documentation
+
+- [User Guide](docs/user-guide.md) - Complete guide to using Kaizen
+- [Dashboard Data Model](docs/dashboard-data-model.md) - Schema for dashboard visualization
+- [Architecture Decisions](docs/adr/) - Key design decisions and rationale
+- [Meta-Evaluation Baseline](meta/BASELINE.md) - Agent performance baselines
 
 ## License
 
