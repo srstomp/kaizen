@@ -1,4 +1,12 @@
-# Kaizen
+```
+ _  __     _
+| |/ /__ _(_)_______ _ __
+| ' // _` | |_  / _ \ '_ \
+| . \ (_| | |/ /  __/ | | |
+|_|\_\__,_|_/___\___|_| |_|
+
+  Continuous improvement for AI agents
+```
 
 ![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
