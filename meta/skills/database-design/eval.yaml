@@ -1,0 +1,21 @@
+# Meta-Evaluation for database-design skill
+# Evaluates the quality and effectiveness of database design skill content
+
+skill: database-design
+evaluator: model-based
+
+criteria:
+  - name: "Schema design principles"
+    check: "Does the skill clearly explain core principles like data integrity, normalization, and explicit constraints?"
+    weight: 0.3
+  - name: "Migration safety guidance"
+    check: "Are safe migration patterns and dangerous operations clearly documented with actionable guidance?"
+    weight: 0.3
+  - name: "Practical patterns"
+    check: "Does it include practical patterns for timestamps, soft deletes, indexing, and common relationships?"
+    weight: 0.2
+  - name: "Design process and deliverables"
+    check: "Is the design process clear with specific deliverables like ER diagrams, DDL, and index plans?"
+    weight: 0.2
+
+threshold: 0.8

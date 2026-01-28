@@ -1,0 +1,182 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Dashboard Data Schema",
+  "description": "JSON schema for Yokay Evals dashboard data model",
+  "version": "1.0.0",
+  "type": "object",
+  "required": ["metadata", "time_series", "agents", "failure_categories"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["generated_at", "version", "date_range"],
+      "properties": {
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the dashboard data was generated"
+        },
+        "version": {
+          "type": "string",
+          "description": "Schema version",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "date_range": {
+          "type": "object",
+          "required": ["start", "end"],
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start of the date range for filtered data"
+            },
+            "end": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End of the date range for filtered data"
+            }
+          }
+        }
+      }
+    },
+    "time_series": {
+      "type": "array",
+      "description": "Time series data with daily granularity",
+      "items": {
+        "type": "object",
+        "required": ["timestamp", "eval_metrics", "meta_metrics"],
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp for this data point (daily bucket)"
+          },
+          "eval_metrics": {
+            "type": "object",
+            "required": ["pass_rate", "avg_score", "total_count", "pass_count", "fail_count"],
+            "properties": {
+              "pass_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Percentage of evaluations that passed"
+              },
+              "avg_score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Average score across all evaluations"
+              },
+              "total_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of evaluations"
+              },
+              "pass_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of evaluations that passed"
+              },
+              "fail_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of evaluations that failed"
+              }
+            }
+          },
+          "meta_metrics": {
+            "type": "object",
+            "required": ["avg_consistency", "total_agents"],
+            "properties": {
+              "avg_consistency": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Average consistency percentage across all agents"
+              },
+              "total_agents": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of agents evaluated"
+              }
+            }
+          }
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "description": "Per-agent metrics",
+      "items": {
+        "type": "object",
+        "required": ["agent_name", "metrics"],
+        "properties": {
+          "agent_name": {
+            "type": "string",
+            "description": "Name of the agent"
+          },
+          "metrics": {
+            "type": "object",
+            "required": ["consistency_percentage", "run_count", "last_run"],
+            "properties": {
+              "consistency_percentage": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Consistency percentage for this agent"
+              },
+              "run_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of runs for this agent"
+              },
+              "last_run": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 timestamp of the last run"
+              }
+            }
+          }
+        }
+      }
+    },
+    "failure_categories": {
+      "type": "array",
+      "description": "Failure category counts and metrics",
+      "items": {
+        "type": "object",
+        "required": ["category", "count", "pass_rate"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "missed-tasks",
+              "missing-tests",
+              "wrong-product",
+              "regression",
+              "premature-completion",
+              "scope-creep",
+              "integration-failure",
+              "session-amnesia",
+              "hallucinated-deps",
+              "security-flaw",
+              "tool-misuse",
+              "task-quality"
+            ],
+            "description": "Failure category from failures/schema.yaml"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of failures in this category"
+          },
+          "pass_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Pass rate for this failure category"
+          }
+        }
+      }
+    }
+  }
+}

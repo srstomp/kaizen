@@ -1,0 +1,21 @@
+# Meta-Evaluation for testing-strategy skill
+# Evaluates the quality and effectiveness of testing strategy skill content
+
+skill: testing-strategy
+evaluator: model-based
+
+criteria:
+  - name: "Clear decision framework"
+    check: "Does the skill provide a clear decision process for choosing between unit, integration, and E2E tests?"
+    weight: 0.3
+  - name: "Coverage guidance"
+    check: "Are coverage targets and test pyramid ratios clearly defined with practical justification?"
+    weight: 0.3
+  - name: "Anti-patterns identified"
+    check: "Are testing anti-patterns (over-mocking, snapshot abuse, test interdependence) clearly explained with alternatives?"
+    weight: 0.2
+  - name: "Common scenarios covered"
+    check: "Does it address common testing scenarios like API endpoints, UI components, and user flows with specific guidance?"
+    weight: 0.2
+
+threshold: 0.8

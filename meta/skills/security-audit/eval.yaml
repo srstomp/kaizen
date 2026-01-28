@@ -1,0 +1,21 @@
+# Meta-Evaluation for security-audit skill
+# Evaluates the quality and effectiveness of security audit skill content
+
+skill: security-audit
+evaluator: model-based
+
+criteria:
+  - name: "OWASP Top 10 coverage"
+    check: "Does the skill comprehensively cover OWASP Top 10 vulnerabilities with grep patterns and detection methods?"
+    weight: 0.3
+  - name: "Actionable remediation"
+    check: "Are remediation steps concrete and implementable with clear code examples showing vulnerable vs fixed patterns?"
+    weight: 0.3
+  - name: "Tool integration"
+    check: "Does it include practical tool usage (npm audit, grep patterns, secret scanners) with command examples?"
+    weight: 0.2
+  - name: "Severity classification"
+    check: "Is there a clear severity classification system (Critical/High/Medium/Low) with appropriate SLAs and decision trees?"
+    weight: 0.2
+
+threshold: 0.8

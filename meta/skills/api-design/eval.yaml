@@ -1,0 +1,21 @@
+# Meta-Evaluation for api-design skill
+# Evaluates the quality and effectiveness of API design skill content
+
+skill: api-design
+evaluator: model-based
+
+criteria:
+  - name: "RESTful patterns coverage"
+    check: "Does the skill comprehensively cover RESTful API design patterns, HTTP methods, status codes, and resource modeling?"
+    weight: 0.3
+  - name: "Practical examples"
+    check: "Are the examples realistic and helpful, covering common scenarios like CRUD operations, pagination, and error handling?"
+    weight: 0.3
+  - name: "Design process clarity"
+    check: "Is the design process clearly explained with actionable steps from resources to documentation?"
+    weight: 0.2
+  - name: "Anti-patterns documented"
+    check: "Are common mistakes (verbs in URLs, inconsistent naming, wrong status codes) clearly identified and explained?"
+    weight: 0.2
+
+threshold: 0.8

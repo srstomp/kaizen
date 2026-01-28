@@ -30,3 +30,12 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Build output
+bin/
+
+# Results (generated during runs)
+results/
+
+# Test shell scripts (development helpers)
+test_*.sh

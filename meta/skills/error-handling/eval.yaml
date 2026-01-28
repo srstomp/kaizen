@@ -1,0 +1,21 @@
+# Meta-Evaluation for error-handling skill
+# Evaluates the quality and effectiveness of error handling skill content
+
+skill: error-handling
+evaluator: model-based
+
+criteria:
+  - name: "Error pattern coverage"
+    check: "Does the skill comprehensively cover error patterns including custom errors, Result types, and error boundaries?"
+    weight: 0.3
+  - name: "Recovery strategies"
+    check: "Are recovery patterns (retry, circuit breaker, graceful degradation) clearly explained with practical implementations?"
+    weight: 0.3
+  - name: "API error design"
+    check: "Does it provide clear guidance on API error responses, status code mapping, and consistent error shapes?"
+    weight: 0.2
+  - name: "User-facing guidance"
+    check: "Are principles for user error messages clearly articulated with good vs bad examples?"
+    weight: 0.2
+
+threshold: 0.8

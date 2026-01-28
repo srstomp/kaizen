@@ -1,0 +1,104 @@
+# Yokay Evals - Release Quality Thresholds
+# ==========================================
+#
+# This configuration file defines the minimum acceptable quality metrics that must
+# be met before a release can be approved. These thresholds are used by the gate
+# command to automatically determine if the codebase meets release quality standards.
+#
+# Version: 1.0.0
+# Last Updated: 2026-01-28
+
+# Eval Thresholds
+# ---------------
+# Quality metrics for task evaluation (eval command output).
+# These measure how well AI agents perform on assigned implementation tasks.
+eval:
+  # Accuracy Threshold (percentage)
+  # Minimum acceptable accuracy for task completion evaluations.
+  # This measures how correctly the agent implemented the task requirements.
+  #
+  # Value: 90.0 means at least 90% of task requirements must be correctly implemented.
+  # Lower values indicate incomplete or incorrect implementations.
+  #
+  # Measured by: Average overall_score from task-eval-log.json
+  # Example: If 10 tasks were evaluated and scores are [85, 92, 95, 88, 90, 93, 91, 89, 94, 90],
+  #          the average is 90.7%, which passes the 90% threshold.
+  accuracy: 90.0
+
+# Meta Thresholds
+# ---------------
+# Quality metrics for meta-evaluation (meta command output).
+# These measure consistency and reliability of the evaluation system itself.
+meta:
+  # Consistency Threshold (percentage)
+  # Minimum acceptable consistency for repeated evaluations.
+  # This is also known as pass@k - the percentage of times an evaluation
+  # produces consistent results when run multiple times on the same task.
+  #
+  # Value: 95.0 means evaluations must be consistent at least 95% of the time.
+  # Lower values indicate unreliable or non-deterministic evaluation behavior.
+  #
+  # Measured by: Average consistency_percentage from consistency-log.json
+  # Example: If boundary testing shows [96, 97, 95, 98, 94] consistency scores,
+  #          the average is 96%, which passes the 95% threshold.
+  consistency: 95.0
+
+# Regression Thresholds
+# ---------------------
+# Acceptable limits for performance degradation between releases.
+# These prevent quality from degrading over time.
+regression:
+  # Maximum Allowed Performance Drop (percentage)
+  # Maximum acceptable decrease in metrics compared to previous release.
+  #
+  # Value: 5.0 means current release metrics can be at most 5% lower than
+  #        the previous release. If previous release had 95% accuracy,
+  #        current release must have at least 90.25% (95 - 5% of 95).
+  #
+  # Note: This is a percentage-point drop, not an absolute percentage.
+  # Example: If previous release had 92% accuracy and current has 88%,
+  #          the drop is 4 percentage points, which passes the 5% threshold.
+  #          If current release had 86%, the drop is 6 points, which fails.
+  max_drop_percent: 5.0
+
+# Usage Notes
+# -----------
+#
+# 1. Thresholds are percentages (0-100 scale)
+# 2. All thresholds must be met for a release to pass the gate
+# 3. Update these values carefully - raising thresholds improves quality but
+#    may block releases; lowering them allows more releases but reduces quality
+# 4. Document the reasoning when changing thresholds in commit messages
+# 5. Consider the trade-off between velocity and quality for your project
+#
+# Gate Command Usage
+# ------------------
+#
+# Check if current metrics meet thresholds:
+#   yokay-evals gate --type all
+#   yokay-evals gate --type eval
+#   yokay-evals gate --type meta
+#
+# The gate command will:
+# 1. Load thresholds from this file
+# 2. Load actual metrics from reports/ directory
+# 3. Compare metrics against thresholds
+# 4. Exit 0 if all checks pass, exit 1 if any fail
+#
+# Integration with CI/CD
+# ----------------------
+#
+# Add to your CI pipeline:
+#   - Run evaluations: yokay-evals eval
+#   - Run meta-evals: yokay-evals meta
+#   - Check gate: yokay-evals gate --type all
+#   - Block merge/deploy if gate fails
+#
+# Recommended Threshold Evolution
+# --------------------------------
+#
+# Start conservative (lower thresholds) and gradually increase:
+# - Week 1-2: accuracy: 80%, consistency: 90%, regression: 10%
+# - Month 1:  accuracy: 85%, consistency: 92%, regression: 7%
+# - Month 3:  accuracy: 90%, consistency: 95%, regression: 5% (current)
+# - Month 6+: accuracy: 93%, consistency: 97%, regression: 3% (aspirational)
