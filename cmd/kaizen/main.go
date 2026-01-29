@@ -86,10 +86,15 @@ func main() {
 	initBootstrap := initCmd.Bool("bootstrap", false, "Bootstrap category stats from existing failures directory")
 	initFailuresDir := initCmd.String("failures-dir", "./failures", "Path to failures directory for bootstrapping")
 
+	suggestCmd := flag.NewFlagSet("suggest", flag.ExitOnError)
+	suggestTaskID := suggestCmd.String("task-id", "", "Task ID to associate with (required)")
+	suggestCategory := suggestCmd.String("category", "", "Failure category to get suggestions for (required)")
+
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: kaizen <command> [options]")
 		fmt.Println("\nCommands:")
 		fmt.Println("  init                Initialize kaizen configuration directory")
+		fmt.Println("  suggest             Generate fix task suggestions based on failure patterns")
 		fmt.Println("  grade               Run a single grader on a single input")
 		fmt.Println("  grade-skills        Grade all pokayokay skills and generate report")
 		fmt.Println("  grade-task          Run code-based graders on task changes")
@@ -153,6 +158,39 @@ func main() {
 				}
 				fmt.Printf("Total: %d cases across %d categories\n", total, len(stats))
 			}
+		}
+
+	case "suggest":
+		suggestCmd.Parse(os.Args[2:])
+
+		// Validate required flags
+		if *suggestTaskID == "" {
+			fmt.Println("Error: --task-id flag is required")
+			suggestCmd.Usage()
+			os.Exit(1)
+		}
+		if *suggestCategory == "" {
+			fmt.Println("Error: --category flag is required")
+			suggestCmd.Usage()
+			os.Exit(1)
+		}
+
+		// Check if kaizen is initialized
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Failed to get home directory: %v", err)
+		}
+		configDir := filepath.Join(homeDir, ".config", "kaizen")
+		dbPath := filepath.Join(configDir, "failures.db")
+
+		if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+			fmt.Fprintln(os.Stderr, "Error: kaizen not initialized. Run 'kaizen init' first.")
+			os.Exit(1)
+		}
+
+		if err := runSuggestCommand(*suggestTaskID, *suggestCategory); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
 		}
 
 	case "grade":
