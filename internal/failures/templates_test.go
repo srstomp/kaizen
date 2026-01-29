@@ -3,6 +3,7 @@ package failures
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -59,8 +60,7 @@ func TestMissingTestsTemplate(t *testing.T) {
 		t.Errorf("Expected category 'missing-tests', got '%s'", template.Category)
 	}
 
-	// Verify prefix (WT per schema, but task says MT)
-	// Using MT as per task requirements
+	// Verify prefix
 	if template.Prefix != "MT" {
 		t.Errorf("Expected prefix 'MT', got '%s'", template.Prefix)
 	}
@@ -75,16 +75,16 @@ func TestMissingTestsTemplate(t *testing.T) {
 	}
 
 	// Verify template variables are present
-	if !containsTemplateVar(template.FixTask.TitleTemplate, "{original_task_id}") {
+	if !strings.Contains(template.FixTask.TitleTemplate, "{original_task_id}") {
 		t.Error("Title template missing {original_task_id} variable")
 	}
 
-	if !containsTemplateVar(template.FixTask.DescriptionTemplate, "{original_task_id}") {
+	if !strings.Contains(template.FixTask.DescriptionTemplate, "{original_task_id}") {
 		t.Error("Description template missing {original_task_id} variable")
 	}
 
 	// Verify acceptance criteria format
-	if !containsString(template.FixTask.DescriptionTemplate, "- [ ]") {
+	if !strings.Contains(template.FixTask.DescriptionTemplate, "- [ ]") {
 		t.Error("Description template missing acceptance criteria checkboxes")
 	}
 }
@@ -112,7 +112,7 @@ func TestScopeCreepTemplate(t *testing.T) {
 	}
 
 	// Verify template variables
-	if !containsTemplateVar(template.FixTask.TitleTemplate, "{original_task_id}") {
+	if !strings.Contains(template.FixTask.TitleTemplate, "{original_task_id}") {
 		t.Error("Title template missing {original_task_id} variable")
 	}
 }
@@ -140,7 +140,7 @@ func TestWrongProductTemplate(t *testing.T) {
 	}
 
 	// Verify template variables
-	if !containsTemplateVar(template.FixTask.TitleTemplate, "{original_task_id}") {
+	if !strings.Contains(template.FixTask.TitleTemplate, "{original_task_id}") {
 		t.Error("Title template missing {original_task_id} variable")
 	}
 }
@@ -172,8 +172,8 @@ func TestAllTemplatesHaveValidYAML(t *testing.T) {
 			if template.FixTask.DescriptionTemplate == "" {
 				t.Error("Description template is empty")
 			}
-			if template.FixTask.EstimateHours == 0 {
-				t.Error("Estimate hours is 0")
+			if template.FixTask.EstimateHours <= 0 {
+				t.Error("Estimate hours must be positive")
 			}
 		})
 	}
@@ -203,21 +203,3 @@ func loadTemplate(t *testing.T, filename string) Template {
 	return template
 }
 
-// Helper to check if a string contains a template variable
-func containsTemplateVar(s, varName string) bool {
-	return containsString(s, varName)
-}
-
-// Helper to check if a string contains a substring
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && contains(s, substr))
-}
-
-func contains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

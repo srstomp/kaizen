@@ -8,6 +8,7 @@ fix_task:
     Quality review failed on {original_task_id}.
 
     Issue: Implementation exceeded spec requirements
+    Files: {files}
     Details: {details}
 
     Acceptance criteria:
