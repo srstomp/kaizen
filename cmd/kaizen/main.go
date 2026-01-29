@@ -93,10 +93,17 @@ func main() {
 	detectCmd := flag.NewFlagSet("detect-category", flag.ExitOnError)
 	detectDetails := detectCmd.String("details", "", "Text to analyze for category detection (required)")
 
+	captureCmd := flag.NewFlagSet("capture", flag.ExitOnError)
+	captureTaskID := captureCmd.String("task-id", "", "Task ID where the failure occurred (required)")
+	captureCategory := captureCmd.String("category", "", "Failure category (required)")
+	captureDetails := captureCmd.String("details", "", "Details about the failure (required)")
+	captureSource := captureCmd.String("source", "", "Source of the failure, e.g. spec-review, quality-review (required)")
+
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: kaizen <command> [options]")
 		fmt.Println("\nCommands:")
 		fmt.Println("  init                Initialize kaizen configuration directory")
+		fmt.Println("  capture             Capture a failure record in the database")
 		fmt.Println("  suggest             Generate fix task suggestions based on failure patterns")
 		fmt.Println("  detect-category     Detect failure category from text details")
 		fmt.Println("  grade               Run a single grader on a single input")
@@ -210,6 +217,52 @@ func main() {
 		output, err := runDetectCategoryCommand(*detectDetails)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println(output)
+
+	case "capture":
+		captureCmd.Parse(os.Args[2:])
+
+		// Validate required flags
+		if *captureTaskID == "" {
+			fmt.Println("Error: --task-id flag is required")
+			captureCmd.Usage()
+			os.Exit(1)
+		}
+		if *captureCategory == "" {
+			fmt.Println("Error: --category flag is required")
+			captureCmd.Usage()
+			os.Exit(1)
+		}
+		if *captureDetails == "" {
+			fmt.Println("Error: --details flag is required")
+			captureCmd.Usage()
+			os.Exit(1)
+		}
+		if *captureSource == "" {
+			fmt.Println("Error: --source flag is required")
+			captureCmd.Usage()
+			os.Exit(1)
+		}
+
+		// Check if kaizen is initialized
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Failed to get home directory: %v", err)
+		}
+		configDir := filepath.Join(homeDir, ".config", "kaizen")
+		dbPath := filepath.Join(configDir, "failures.db")
+
+		if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+			fmt.Fprintln(os.Stderr, "Error: kaizen not initialized. Run 'kaizen init' first.")
+			os.Exit(1)
+		}
+
+		output, err := runCaptureCommand(*captureTaskID, *captureCategory, *captureDetails, *captureSource)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, output)
 			os.Exit(1)
 		}
 
