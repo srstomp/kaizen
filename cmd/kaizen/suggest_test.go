@@ -180,6 +180,68 @@ func TestSuggestCommandMissingTemplate(t *testing.T) {
 	}
 }
 
+func TestSuggestCommandLowConfidence(t *testing.T) {
+	// Create a temporary database for testing
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test-failures.db")
+
+	// Initialize database
+	store, err := failures.NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create test store: %v", err)
+	}
+
+	// Add test data with only 1 occurrence (low confidence)
+	now := time.Now()
+	err = store.UpsertCategoryStats("scope-creep", 1, now.Add(-1*24*time.Hour), now)
+	if err != nil {
+		t.Fatalf("Failed to upsert category stats: %v", err)
+	}
+	store.Close()
+
+	// Create templates directory with test template
+	templatesDir := filepath.Join(tmpDir, "templates")
+	if err := os.MkdirAll(templatesDir, 0755); err != nil {
+		t.Fatalf("Failed to create templates directory: %v", err)
+	}
+
+	templateYAML := `category: scope-creep
+prefix: SC
+fix_task:
+  title_template: "Review scope for {original_task_id}"
+  type: chore
+  description_template: "Task {original_task_id} had scope creep."
+  estimate_hours: 0.5
+`
+	templatePath := filepath.Join(templatesDir, "scope-creep.yaml")
+	if err := os.WriteFile(templatePath, []byte(templateYAML), 0644); err != nil {
+		t.Fatalf("Failed to write template file: %v", err)
+	}
+
+	// Run the suggest command
+	output, err := runSuggestCommandWithConfig("TASK-LOW", "scope-creep", dbPath, templatesDir)
+	if err != nil {
+		t.Fatalf("runSuggestCommand failed: %v", err)
+	}
+
+	// Parse JSON output
+	var result SuggestOutput
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
+	}
+
+	// Verify low confidence output
+	if result.Occurrences != 1 {
+		t.Errorf("Occurrences = %d, want %d", result.Occurrences, 1)
+	}
+	if result.Confidence != "low" {
+		t.Errorf("Confidence = %q, want %q", result.Confidence, "low")
+	}
+	if result.Action != "log-only" {
+		t.Errorf("Action = %q, want %q", result.Action, "log-only")
+	}
+}
+
 func TestSuggestCommandDatabaseNotExist(t *testing.T) {
 	// Use a non-existent database path
 	dbPath := "/nonexistent/path/failures.db"
