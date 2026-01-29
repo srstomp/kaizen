@@ -90,11 +90,15 @@ func main() {
 	suggestTaskID := suggestCmd.String("task-id", "", "Task ID to associate with (required)")
 	suggestCategory := suggestCmd.String("category", "", "Failure category to get suggestions for (required)")
 
+	detectCmd := flag.NewFlagSet("detect-category", flag.ExitOnError)
+	detectDetails := detectCmd.String("details", "", "Text to analyze for category detection (required)")
+
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: kaizen <command> [options]")
 		fmt.Println("\nCommands:")
 		fmt.Println("  init                Initialize kaizen configuration directory")
 		fmt.Println("  suggest             Generate fix task suggestions based on failure patterns")
+		fmt.Println("  detect-category     Detect failure category from text details")
 		fmt.Println("  grade               Run a single grader on a single input")
 		fmt.Println("  grade-skills        Grade all pokayokay skills and generate report")
 		fmt.Println("  grade-task          Run code-based graders on task changes")
@@ -192,6 +196,24 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
+
+	case "detect-category":
+		detectCmd.Parse(os.Args[2:])
+
+		// Validate required flags
+		if *detectDetails == "" {
+			fmt.Println("Error: --details flag is required")
+			detectCmd.Usage()
+			os.Exit(1)
+		}
+
+		output, err := runDetectCategoryCommand(*detectDetails)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println(output)
 
 	case "grade":
 		gradeSingleCmd.Parse(os.Args[2:])
