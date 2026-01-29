@@ -9,21 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// FixTaskTemplate represents the structure of a fix task template
-type FixTaskTemplate struct {
-	TitleTemplate       string `yaml:"title_template"`
-	Type                string `yaml:"type"`
-	DescriptionTemplate string `yaml:"description_template"`
-	EstimateHours       float64 `yaml:"estimate_hours"`
-}
-
-// Template represents the complete template file structure
-type Template struct {
-	Category string           `yaml:"category"`
-	Prefix   string           `yaml:"prefix"`
-	FixTask  FixTaskTemplate  `yaml:"fix_task"`
-}
-
 func TestTemplateFilesExist(t *testing.T) {
 	// Get project root (go up from internal/failures to project root)
 	projectRoot, err := filepath.Abs("../..")
@@ -201,5 +186,220 @@ func loadTemplate(t *testing.T, filename string) Template {
 	}
 
 	return template
+}
+
+func TestNewTemplateLoader(t *testing.T) {
+	loader := NewTemplateLoader("/path/to/templates")
+	if loader == nil {
+		t.Fatal("NewTemplateLoader returned nil")
+	}
+}
+
+func TestLoadTemplate(t *testing.T) {
+	projectRoot, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatalf("Failed to get project root: %v", err)
+	}
+
+	templatesDir := filepath.Join(projectRoot, "failures", "templates")
+	loader := NewTemplateLoader(templatesDir)
+
+	tests := []struct {
+		name         string
+		category     string
+		wantCategory string
+		wantPrefix   string
+		wantErr      bool
+	}{
+		{
+			name:         "load missing-tests template",
+			category:     "missing-tests",
+			wantCategory: "missing-tests",
+			wantPrefix:   "MT",
+			wantErr:      false,
+		},
+		{
+			name:         "load scope-creep template",
+			category:     "scope-creep",
+			wantCategory: "scope-creep",
+			wantPrefix:   "SC",
+			wantErr:      false,
+		},
+		{
+			name:         "load wrong-product template",
+			category:     "wrong-product",
+			wantCategory: "wrong-product",
+			wantPrefix:   "WP",
+			wantErr:      false,
+		},
+		{
+			name:     "non-existent template",
+			category: "does-not-exist",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			template, err := loader.LoadTemplate(tt.category)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if template.Category != tt.wantCategory {
+				t.Errorf("Expected category %s, got %s", tt.wantCategory, template.Category)
+			}
+
+			if template.Prefix != tt.wantPrefix {
+				t.Errorf("Expected prefix %s, got %s", tt.wantPrefix, template.Prefix)
+			}
+		})
+	}
+}
+
+func TestLoadAllTemplates(t *testing.T) {
+	projectRoot, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatalf("Failed to get project root: %v", err)
+	}
+
+	templatesDir := filepath.Join(projectRoot, "failures", "templates")
+	loader := NewTemplateLoader(templatesDir)
+
+	templates, err := loader.LoadAllTemplates()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	expectedCategories := []string{"missing-tests", "scope-creep", "wrong-product"}
+	for _, category := range expectedCategories {
+		if _, ok := templates[category]; !ok {
+			t.Errorf("Expected template for category %s", category)
+		}
+	}
+
+	if len(templates) != len(expectedCategories) {
+		t.Errorf("Expected %d templates, got %d", len(expectedCategories), len(templates))
+	}
+}
+
+func TestRenderTitle(t *testing.T) {
+	template := &Template{
+		Category: "missing-tests",
+		Prefix:   "MT",
+		FixTask: FixTaskTemplate{
+			TitleTemplate:       "Fix: Add tests for {original_task_id}",
+			Type:                "bug",
+			DescriptionTemplate: "Description",
+			EstimateHours:       1.0,
+		},
+	}
+
+	tests := []struct {
+		name string
+		vars map[string]string
+		want string
+	}{
+		{
+			name: "replace single variable",
+			vars: map[string]string{
+				"original_task_id": "TASK-123",
+			},
+			want: "Fix: Add tests for TASK-123",
+		},
+		{
+			name: "missing variable leaves placeholder",
+			vars: map[string]string{},
+			want: "Fix: Add tests for {original_task_id}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := template.RenderTitle(tt.vars)
+			if got != tt.want {
+				t.Errorf("RenderTitle() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRenderDescription(t *testing.T) {
+	template := &Template{
+		Category: "missing-tests",
+		Prefix:   "MT",
+		FixTask: FixTaskTemplate{
+			TitleTemplate: "Title",
+			Type:          "bug",
+			DescriptionTemplate: `Quality review failed on {original_task_id}.
+
+Issue: Missing test coverage
+Files: {files}
+Details: {details}
+
+Acceptance criteria:
+- [ ] Add unit tests for each file
+- [ ] Tests pass locally
+- [ ] Coverage meets threshold`,
+			EstimateHours: 1.0,
+		},
+	}
+
+	tests := []struct {
+		name string
+		vars map[string]string
+		want string
+	}{
+		{
+			name: "replace all variables",
+			vars: map[string]string{
+				"original_task_id": "TASK-123",
+				"files":            "auth.go, login.go",
+				"details":          "Missing unit tests",
+			},
+			want: `Quality review failed on TASK-123.
+
+Issue: Missing test coverage
+Files: auth.go, login.go
+Details: Missing unit tests
+
+Acceptance criteria:
+- [ ] Add unit tests for each file
+- [ ] Tests pass locally
+- [ ] Coverage meets threshold`,
+		},
+		{
+			name: "partial replacement",
+			vars: map[string]string{
+				"original_task_id": "TASK-456",
+			},
+			want: `Quality review failed on TASK-456.
+
+Issue: Missing test coverage
+Files: {files}
+Details: {details}
+
+Acceptance criteria:
+- [ ] Add unit tests for each file
+- [ ] Tests pass locally
+- [ ] Coverage meets threshold`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := template.RenderDescription(tt.vars)
+			if got != tt.want {
+				t.Errorf("RenderDescription() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }
 
