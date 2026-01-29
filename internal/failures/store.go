@@ -31,6 +31,14 @@ func NewStore(dbPath string) (*Store, error) {
 	return store, nil
 }
 
+// Close closes the database connection
+func (s *Store) Close() error {
+	if s.db != nil {
+		return s.db.Close()
+	}
+	return nil
+}
+
 // initSchema creates the necessary tables and indexes if they don't exist.
 // This method is idempotent and safe to run multiple times.
 func (s *Store) initSchema() error {

@@ -243,3 +243,43 @@ func TestStoreSchemaDetails(t *testing.T) {
 		t.Error("expected error when inserting duplicate category, got nil")
 	}
 }
+
+func TestStoreClose(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "failures.db")
+
+	store, err := NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("NewStore failed: %v", err)
+	}
+
+	// Close the store
+	if err := store.Close(); err != nil {
+		t.Errorf("Close() returned error: %v", err)
+	}
+
+	// Attempting to use the database after closing should fail
+	_, err = store.db.Exec("SELECT 1")
+	if err == nil {
+		t.Error("expected error when using database after Close(), got nil")
+	}
+}
+
+func TestStoreCloseIdempotent(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "failures.db")
+
+	store, err := NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("NewStore failed: %v", err)
+	}
+
+	// Close multiple times should not panic
+	if err := store.Close(); err != nil {
+		t.Errorf("first Close() returned error: %v", err)
+	}
+
+	if err := store.Close(); err != nil {
+		t.Errorf("second Close() returned error: %v", err)
+	}
+}

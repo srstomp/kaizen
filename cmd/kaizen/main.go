@@ -82,9 +82,12 @@ func main() {
 	dashboardReportsDir := dashboardCmd.String("reports-dir", "", "Path to reports directory (default: reports/)")
 	dashboardOutput := dashboardCmd.String("output", "dashboard.html", "Output file path for HTML dashboard")
 
+	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
+
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: yokay-evals <command> [options]")
+		fmt.Println("Usage: kaizen <command> [options]")
 		fmt.Println("\nCommands:")
+		fmt.Println("  init                Initialize kaizen configuration directory")
 		fmt.Println("  grade               Run a single grader on a single input")
 		fmt.Println("  grade-skills        Grade all pokayokay skills and generate report")
 		fmt.Println("  grade-task          Run code-based graders on task changes")
@@ -98,6 +101,25 @@ func main() {
 	}
 
 	switch os.Args[1] {
+	case "init":
+		initCmd.Parse(os.Args[2:])
+
+		// Get home directory and create config path
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Failed to get home directory: %v", err)
+		}
+		configDir := filepath.Join(homeDir, ".config", "kaizen")
+
+		if err := runInitCommand(configDir); err != nil {
+			log.Fatalf("Failed to initialize kaizen: %v", err)
+		}
+
+		fmt.Printf("Kaizen initialized successfully!\n")
+		fmt.Printf("Configuration directory: %s\n", configDir)
+		fmt.Printf("  - failures.db created\n")
+		fmt.Printf("  - config.yaml created\n")
+
 	case "grade":
 		gradeSingleCmd.Parse(os.Args[2:])
 
