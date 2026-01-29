@@ -1,0 +1,17 @@
+# Fix task template for scope-creep failures
+category: scope-creep
+prefix: SC
+fix_task:
+  title_template: "Fix: Remove extra features from {original_task_id}"
+  type: bug
+  description_template: |
+    Quality review failed on {original_task_id}.
+
+    Issue: Implementation exceeded spec requirements
+    Details: {details}
+
+    Acceptance criteria:
+    - [ ] Remove code not in original specification
+    - [ ] Verify implementation matches spec exactly
+    - [ ] Confirm no regressions in required functionality
+  estimate_hours: 0.5

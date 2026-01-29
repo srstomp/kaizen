@@ -1,0 +1,18 @@
+# Fix task template for missing-tests failures
+category: missing-tests
+prefix: MT
+fix_task:
+  title_template: "Fix: Add tests for {original_task_id}"
+  type: bug
+  description_template: |
+    Quality review failed on {original_task_id}.
+
+    Issue: Missing test coverage
+    Files: {files}
+    Details: {details}
+
+    Acceptance criteria:
+    - [ ] Add unit tests for each file
+    - [ ] Tests pass locally
+    - [ ] Coverage meets threshold
+  estimate_hours: 1

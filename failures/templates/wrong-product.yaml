@@ -1,0 +1,17 @@
+# Fix task template for wrong-product failures
+category: wrong-product
+prefix: WP
+fix_task:
+  title_template: "Fix: Correct output for {original_task_id}"
+  type: bug
+  description_template: |
+    Quality review failed on {original_task_id}.
+
+    Issue: Output doesn't match requirements
+    Details: {details}
+
+    Acceptance criteria:
+    - [ ] Review original specification carefully
+    - [ ] Fix implementation to match requirements
+    - [ ] Verify output matches expected behavior
+  estimate_hours: 1.5
