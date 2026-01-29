@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestNewStore(t *testing.T) {
@@ -282,4 +283,214 @@ func TestStoreCloseIdempotent(t *testing.T) {
 	if err := store.Close(); err != nil {
 		t.Errorf("second Close() returned error: %v", err)
 	}
+}
+
+func TestUpsertCategoryStats(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "failures.db")
+
+	store, err := NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("NewStore failed: %v", err)
+	}
+	defer store.Close()
+
+	// Test inserting new category stats
+	category := "missing-tests"
+	count := 5
+	firstSeen := parseTime(t, "2026-01-25T10:00:00Z")
+	lastSeen := parseTime(t, "2026-01-29T15:30:00Z")
+
+	err = store.UpsertCategoryStats(category, count, firstSeen, lastSeen)
+	if err != nil {
+		t.Fatalf("UpsertCategoryStats failed: %v", err)
+	}
+
+	// Verify data was inserted
+	var storedCount int
+	var storedFirstSeen, storedLastSeen string
+	err = store.db.QueryRow(`
+		SELECT occurrence_count, first_seen, last_seen
+		FROM category_stats
+		WHERE category = ?
+	`, category).Scan(&storedCount, &storedFirstSeen, &storedLastSeen)
+
+	if err != nil {
+		t.Fatalf("failed to query category_stats: %v", err)
+	}
+
+	if storedCount != count {
+		t.Errorf("occurrence_count = %d, expected %d", storedCount, count)
+	}
+
+	// Verify timestamps (allow for formatting differences)
+	if storedFirstSeen == "" {
+		t.Error("first_seen should not be empty")
+	}
+	if storedLastSeen == "" {
+		t.Error("last_seen should not be empty")
+	}
+}
+
+func TestUpsertCategoryStatsUpdate(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "failures.db")
+
+	store, err := NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("NewStore failed: %v", err)
+	}
+	defer store.Close()
+
+	category := "wrong-product"
+
+	// Insert initial stats
+	firstSeen := parseTime(t, "2026-01-20T10:00:00Z")
+	lastSeen := parseTime(t, "2026-01-25T15:00:00Z")
+	err = store.UpsertCategoryStats(category, 3, firstSeen, lastSeen)
+	if err != nil {
+		t.Fatalf("first UpsertCategoryStats failed: %v", err)
+	}
+
+	// Update with new count and later last_seen
+	newLastSeen := parseTime(t, "2026-01-29T18:00:00Z")
+	err = store.UpsertCategoryStats(category, 7, firstSeen, newLastSeen)
+	if err != nil {
+		t.Fatalf("second UpsertCategoryStats failed: %v", err)
+	}
+
+	// Verify data was updated
+	var storedCount int
+	err = store.db.QueryRow(`
+		SELECT occurrence_count
+		FROM category_stats
+		WHERE category = ?
+	`, category).Scan(&storedCount)
+
+	if err != nil {
+		t.Fatalf("failed to query category_stats: %v", err)
+	}
+
+	if storedCount != 7 {
+		t.Errorf("occurrence_count = %d, expected 7", storedCount)
+	}
+
+	// Verify only one row exists for this category
+	var rowCount int
+	err = store.db.QueryRow(`
+		SELECT COUNT(*) FROM category_stats WHERE category = ?
+	`, category).Scan(&rowCount)
+
+	if err != nil {
+		t.Fatalf("failed to count rows: %v", err)
+	}
+
+	if rowCount != 1 {
+		t.Errorf("expected 1 row for category, got %d", rowCount)
+	}
+}
+
+func TestUpsertCategoryStatsMultipleCategories(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "failures.db")
+
+	store, err := NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("NewStore failed: %v", err)
+	}
+	defer store.Close()
+
+	firstSeen := parseTime(t, "2026-01-25T10:00:00Z")
+	lastSeen := parseTime(t, "2026-01-29T15:00:00Z")
+
+	// Insert stats for multiple categories
+	categories := map[string]int{
+		"missing-tests": 5,
+		"wrong-product": 3,
+		"missed-tasks":  2,
+		"scope-creep":   1,
+	}
+
+	for cat, count := range categories {
+		err = store.UpsertCategoryStats(cat, count, firstSeen, lastSeen)
+		if err != nil {
+			t.Fatalf("UpsertCategoryStats failed for %s: %v", cat, err)
+		}
+	}
+
+	// Verify all categories were inserted
+	var totalRows int
+	err = store.db.QueryRow(`SELECT COUNT(*) FROM category_stats`).Scan(&totalRows)
+	if err != nil {
+		t.Fatalf("failed to count rows: %v", err)
+	}
+
+	if totalRows != 4 {
+		t.Errorf("expected 4 rows, got %d", totalRows)
+	}
+
+	// Verify each category has correct count
+	for cat, expectedCount := range categories {
+		var storedCount int
+		err = store.db.QueryRow(`
+			SELECT occurrence_count
+			FROM category_stats
+			WHERE category = ?
+		`, cat).Scan(&storedCount)
+
+		if err != nil {
+			t.Fatalf("failed to query category %s: %v", cat, err)
+		}
+
+		if storedCount != expectedCount {
+			t.Errorf("%s: occurrence_count = %d, expected %d", cat, storedCount, expectedCount)
+		}
+	}
+}
+
+func TestUpsertCategoryStatsZeroCount(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "failures.db")
+
+	store, err := NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("NewStore failed: %v", err)
+	}
+	defer store.Close()
+
+	// Test with zero count
+	category := "empty-category"
+	firstSeen := parseTime(t, "2026-01-25T10:00:00Z")
+	lastSeen := parseTime(t, "2026-01-29T15:00:00Z")
+
+	err = store.UpsertCategoryStats(category, 0, firstSeen, lastSeen)
+	if err != nil {
+		t.Fatalf("UpsertCategoryStats failed: %v", err)
+	}
+
+	// Verify zero count was stored
+	var storedCount int
+	err = store.db.QueryRow(`
+		SELECT occurrence_count
+		FROM category_stats
+		WHERE category = ?
+	`, category).Scan(&storedCount)
+
+	if err != nil {
+		t.Fatalf("failed to query category_stats: %v", err)
+	}
+
+	if storedCount != 0 {
+		t.Errorf("occurrence_count = %d, expected 0", storedCount)
+	}
+}
+
+// Helper function to parse time strings
+func parseTime(t *testing.T, timeStr string) time.Time {
+	t.Helper()
+	parsedTime, err := time.Parse(time.RFC3339, timeStr)
+	if err != nil {
+		t.Fatalf("failed to parse time %q: %v", timeStr, err)
+	}
+	return parsedTime
 }

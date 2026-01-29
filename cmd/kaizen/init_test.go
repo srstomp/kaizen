@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,5 +191,280 @@ func TestConfigYamlFormat(t *testing.T) {
 	// Verify it contains templates_dir
 	if !strings.Contains(content, "templates_dir:") {
 		t.Error("config.yaml should contain templates_dir field")
+	}
+}
+
+func TestBootstrapFromFailuresDirectory(t *testing.T) {
+	tempHome := t.TempDir()
+	configDir := filepath.Join(tempHome, ".config", "kaizen")
+	failuresDir := filepath.Join(tempHome, "failures")
+
+	// Initialize kaizen first
+	err := runInitCommand(configDir)
+	if err != nil {
+		t.Fatalf("runInitCommand failed: %v", err)
+	}
+
+	// Create test failures directory structure
+	createTestFailuresDirectory(t, failuresDir)
+
+	// Run bootstrap
+	dbPath := filepath.Join(configDir, "failures.db")
+	stats, err := bootstrapFromFailures(dbPath, failuresDir)
+	if err != nil {
+		t.Fatalf("bootstrapFromFailures failed: %v", err)
+	}
+
+	// Verify stats were collected
+	if len(stats) == 0 {
+		t.Error("expected category stats, got empty map")
+	}
+
+	// Verify expected categories
+	expectedCategories := []string{"missing-tests", "wrong-product", "missed-tasks"}
+	for _, cat := range expectedCategories {
+		if _, ok := stats[cat]; !ok {
+			t.Errorf("expected category %q in stats", cat)
+		}
+	}
+
+	// Verify counts
+	if stats["missing-tests"] != 3 {
+		t.Errorf("missing-tests count = %d, expected 3", stats["missing-tests"])
+	}
+	if stats["wrong-product"] != 2 {
+		t.Errorf("wrong-product count = %d, expected 2", stats["wrong-product"])
+	}
+	if stats["missed-tasks"] != 1 {
+		t.Errorf("missed-tasks count = %d, expected 1", stats["missed-tasks"])
+	}
+}
+
+func TestBootstrapSkipsSchemaAndTemplateFiles(t *testing.T) {
+	tempHome := t.TempDir()
+	configDir := filepath.Join(tempHome, ".config", "kaizen")
+	failuresDir := filepath.Join(tempHome, "failures")
+
+	// Initialize kaizen first
+	err := runInitCommand(configDir)
+	if err != nil {
+		t.Fatalf("runInitCommand failed: %v", err)
+	}
+
+	// Create test failures directory with schema and template files
+	if err := os.MkdirAll(failuresDir, 0755); err != nil {
+		t.Fatalf("failed to create failures dir: %v", err)
+	}
+
+	// Create schema.yaml (should be skipped)
+	schemaContent := `category: schema-category
+id: SCHEMA-001`
+	if err := os.WriteFile(filepath.Join(failuresDir, "schema.yaml"), []byte(schemaContent), 0644); err != nil {
+		t.Fatalf("failed to create schema.yaml: %v", err)
+	}
+
+	// Create template.yaml (should be skipped)
+	templateContent := `category: template-category
+id: TEMPLATE-001`
+	if err := os.WriteFile(filepath.Join(failuresDir, "template.yaml"), []byte(templateContent), 0644); err != nil {
+		t.Fatalf("failed to create template.yaml: %v", err)
+	}
+
+	// Create a real failure file
+	categoryDir := filepath.Join(failuresDir, "test-category")
+	if err := os.MkdirAll(categoryDir, 0755); err != nil {
+		t.Fatalf("failed to create category dir: %v", err)
+	}
+	failureContent := `category: test-category
+id: TC-001`
+	if err := os.WriteFile(filepath.Join(categoryDir, "TC-001.yaml"), []byte(failureContent), 0644); err != nil {
+		t.Fatalf("failed to create failure file: %v", err)
+	}
+
+	// Run bootstrap
+	dbPath := filepath.Join(configDir, "failures.db")
+	stats, err := bootstrapFromFailures(dbPath, failuresDir)
+	if err != nil {
+		t.Fatalf("bootstrapFromFailures failed: %v", err)
+	}
+
+	// Verify schema and template categories are not in stats
+	if _, ok := stats["schema-category"]; ok {
+		t.Error("schema.yaml should be skipped")
+	}
+	if _, ok := stats["template-category"]; ok {
+		t.Error("template.yaml should be skipped")
+	}
+
+	// Verify only real category is present
+	if stats["test-category"] != 1 {
+		t.Errorf("test-category count = %d, expected 1", stats["test-category"])
+	}
+}
+
+func TestBootstrapSkipsExamplesDirectory(t *testing.T) {
+	tempHome := t.TempDir()
+	configDir := filepath.Join(tempHome, ".config", "kaizen")
+	failuresDir := filepath.Join(tempHome, "failures")
+
+	// Initialize kaizen first
+	err := runInitCommand(configDir)
+	if err != nil {
+		t.Fatalf("runInitCommand failed: %v", err)
+	}
+
+	// Create examples directory
+	examplesDir := filepath.Join(failuresDir, "examples")
+	if err := os.MkdirAll(examplesDir, 0755); err != nil {
+		t.Fatalf("failed to create examples dir: %v", err)
+	}
+
+	// Create a file in examples (should be skipped)
+	exampleContent := `category: example-category
+id: EX-001`
+	if err := os.WriteFile(filepath.Join(examplesDir, "EX-001.yaml"), []byte(exampleContent), 0644); err != nil {
+		t.Fatalf("failed to create example file: %v", err)
+	}
+
+	// Create a real failure file
+	categoryDir := filepath.Join(failuresDir, "real-category")
+	if err := os.MkdirAll(categoryDir, 0755); err != nil {
+		t.Fatalf("failed to create category dir: %v", err)
+	}
+	failureContent := `category: real-category
+id: RC-001`
+	if err := os.WriteFile(filepath.Join(categoryDir, "RC-001.yaml"), []byte(failureContent), 0644); err != nil {
+		t.Fatalf("failed to create failure file: %v", err)
+	}
+
+	// Run bootstrap
+	dbPath := filepath.Join(configDir, "failures.db")
+	stats, err := bootstrapFromFailures(dbPath, failuresDir)
+	if err != nil {
+		t.Fatalf("bootstrapFromFailures failed: %v", err)
+	}
+
+	// Verify examples category is not in stats
+	if _, ok := stats["example-category"]; ok {
+		t.Error("examples directory should be skipped")
+	}
+
+	// Verify only real category is present
+	if stats["real-category"] != 1 {
+		t.Errorf("real-category count = %d, expected 1", stats["real-category"])
+	}
+}
+
+func TestBootstrapHandlesInvalidYAML(t *testing.T) {
+	tempHome := t.TempDir()
+	configDir := filepath.Join(tempHome, ".config", "kaizen")
+	failuresDir := filepath.Join(tempHome, "failures")
+
+	// Initialize kaizen first
+	err := runInitCommand(configDir)
+	if err != nil {
+		t.Fatalf("runInitCommand failed: %v", err)
+	}
+
+	// Create category directory
+	categoryDir := filepath.Join(failuresDir, "test-category")
+	if err := os.MkdirAll(categoryDir, 0755); err != nil {
+		t.Fatalf("failed to create category dir: %v", err)
+	}
+
+	// Create invalid YAML file (should be skipped gracefully)
+	invalidContent := `this is not: [valid yaml: {unclosed`
+	if err := os.WriteFile(filepath.Join(categoryDir, "INVALID.yaml"), []byte(invalidContent), 0644); err != nil {
+		t.Fatalf("failed to create invalid file: %v", err)
+	}
+
+	// Create valid YAML file
+	validContent := `category: test-category
+id: TC-001`
+	if err := os.WriteFile(filepath.Join(categoryDir, "TC-001.yaml"), []byte(validContent), 0644); err != nil {
+		t.Fatalf("failed to create valid file: %v", err)
+	}
+
+	// Run bootstrap - should not fail on invalid YAML
+	dbPath := filepath.Join(configDir, "failures.db")
+	stats, err := bootstrapFromFailures(dbPath, failuresDir)
+	if err != nil {
+		t.Fatalf("bootstrapFromFailures should handle invalid YAML gracefully: %v", err)
+	}
+
+	// Verify valid file was still processed
+	if stats["test-category"] != 1 {
+		t.Errorf("test-category count = %d, expected 1", stats["test-category"])
+	}
+}
+
+func TestBootstrapEmptyDirectory(t *testing.T) {
+	tempHome := t.TempDir()
+	configDir := filepath.Join(tempHome, ".config", "kaizen")
+	failuresDir := filepath.Join(tempHome, "failures")
+
+	// Initialize kaizen first
+	err := runInitCommand(configDir)
+	if err != nil {
+		t.Fatalf("runInitCommand failed: %v", err)
+	}
+
+	// Create empty failures directory
+	if err := os.MkdirAll(failuresDir, 0755); err != nil {
+		t.Fatalf("failed to create failures dir: %v", err)
+	}
+
+	// Run bootstrap on empty directory
+	dbPath := filepath.Join(configDir, "failures.db")
+	stats, err := bootstrapFromFailures(dbPath, failuresDir)
+	if err != nil {
+		t.Fatalf("bootstrapFromFailures failed on empty dir: %v", err)
+	}
+
+	// Verify empty stats
+	if len(stats) != 0 {
+		t.Errorf("expected empty stats for empty directory, got %d categories", len(stats))
+	}
+}
+
+// Helper function to create test failures directory structure
+func createTestFailuresDirectory(t *testing.T, failuresDir string) {
+	t.Helper()
+
+	// Create missing-tests category with 3 files
+	missingTestsDir := filepath.Join(failuresDir, "missing-tests")
+	if err := os.MkdirAll(missingTestsDir, 0755); err != nil {
+		t.Fatalf("failed to create missing-tests dir: %v", err)
+	}
+	for i := 1; i <= 3; i++ {
+		content := fmt.Sprintf("id: MT-%03d\ncategory: missing-tests\n", i)
+		filename := filepath.Join(missingTestsDir, fmt.Sprintf("MT-%03d.yaml", i))
+		if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to create test file: %v", err)
+		}
+	}
+
+	// Create wrong-product category with 2 files
+	wrongProductDir := filepath.Join(failuresDir, "wrong-product")
+	if err := os.MkdirAll(wrongProductDir, 0755); err != nil {
+		t.Fatalf("failed to create wrong-product dir: %v", err)
+	}
+	for i := 1; i <= 2; i++ {
+		content := fmt.Sprintf("id: WP-%03d\ncategory: wrong-product\n", i)
+		filename := filepath.Join(wrongProductDir, fmt.Sprintf("WP-%03d.yaml", i))
+		if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to create test file: %v", err)
+		}
+	}
+
+	// Create missed-tasks category with 1 file
+	missedTasksDir := filepath.Join(failuresDir, "missed-tasks")
+	if err := os.MkdirAll(missedTasksDir, 0755); err != nil {
+		t.Fatalf("failed to create missed-tasks dir: %v", err)
+	}
+	content := "id: MT-001\ncategory: missed-tasks\n"
+	filename := filepath.Join(missedTasksDir, "MT-001.yaml")
+	if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
 	}
 }

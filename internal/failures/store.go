@@ -3,6 +3,7 @@ package failures
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -77,6 +78,26 @@ func (s *Store) initSchema() error {
 	`)
 	if err != nil {
 		return fmt.Errorf("creating category index: %w", err)
+	}
+
+	return nil
+}
+
+// UpsertCategoryStats inserts or updates category statistics in the database.
+// If the category already exists, it updates the occurrence count and timestamps.
+// If the category doesn't exist, it creates a new record.
+func (s *Store) UpsertCategoryStats(category string, count int, firstSeen, lastSeen time.Time) error {
+	_, err := s.db.Exec(`
+		INSERT INTO category_stats (category, occurrence_count, first_seen, last_seen)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(category) DO UPDATE SET
+			occurrence_count = excluded.occurrence_count,
+			first_seen = excluded.first_seen,
+			last_seen = excluded.last_seen
+	`, category, count, firstSeen, lastSeen)
+
+	if err != nil {
+		return fmt.Errorf("upserting category stats for %q: %w", category, err)
 	}
 
 	return nil

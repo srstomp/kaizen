@@ -83,6 +83,8 @@ func main() {
 	dashboardOutput := dashboardCmd.String("output", "dashboard.html", "Output file path for HTML dashboard")
 
 	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
+	initBootstrap := initCmd.Bool("bootstrap", false, "Bootstrap category stats from existing failures directory")
+	initFailuresDir := initCmd.String("failures-dir", "./failures", "Path to failures directory for bootstrapping")
 
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: kaizen <command> [options]")
@@ -119,6 +121,39 @@ func main() {
 		fmt.Printf("Configuration directory: %s\n", configDir)
 		fmt.Printf("  - failures.db created\n")
 		fmt.Printf("  - config.yaml created\n")
+
+		// Run bootstrap if flag is set
+		if *initBootstrap {
+			fmt.Printf("\nBootstrapping from failures directory: %s\n", *initFailuresDir)
+
+			dbPath := filepath.Join(configDir, "failures.db")
+			stats, err := bootstrapFromFailures(dbPath, *initFailuresDir)
+			if err != nil {
+				log.Fatalf("Failed to bootstrap from failures: %v", err)
+			}
+
+			// Print results
+			if len(stats) == 0 {
+				fmt.Printf("No failure cases found in directory.\n")
+			} else {
+				fmt.Printf("\nBootstrap complete:\n")
+
+				// Sort categories for consistent output
+				categories := make([]string, 0, len(stats))
+				for cat := range stats {
+					categories = append(categories, cat)
+				}
+				sort.Strings(categories)
+
+				total := 0
+				for _, cat := range categories {
+					count := stats[cat]
+					total += count
+					fmt.Printf("  %s: %d cases\n", cat, count)
+				}
+				fmt.Printf("Total: %d cases across %d categories\n", total, len(stats))
+			}
+		}
 
 	case "grade":
 		gradeSingleCmd.Parse(os.Args[2:])

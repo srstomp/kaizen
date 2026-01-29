@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/srstomp/kaizen/internal/failures"
+	"gopkg.in/yaml.v3"
 )
 
 const defaultConfigYAML = `# Kaizen configuration
@@ -45,4 +49,108 @@ func runInitCommand(configDir string) error {
 	}
 
 	return nil
+}
+
+// bootstrapFromFailures scans a failures directory and populates category_stats.
+// Returns a map of category -> count for reporting purposes.
+func bootstrapFromFailures(dbPath, failuresDir string) (map[string]int, error) {
+	// Open the database
+	store, err := failures.NewStore(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
+	defer store.Close()
+
+	// Track category stats
+	categoryStats := make(map[string]int)
+	categoryFirstSeen := make(map[string]time.Time)
+	categoryLastSeen := make(map[string]time.Time)
+
+	// Walk the failures directory
+	err = filepath.Walk(failuresDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Printf("Warning: failed to access %s: %v", path, err)
+			return nil // Continue walking
+		}
+
+		// Skip directories
+		if info.IsDir() {
+			// Skip examples directory
+			if info.Name() == "examples" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Skip non-YAML files
+		if !strings.HasSuffix(info.Name(), ".yaml") && !strings.HasSuffix(info.Name(), ".yml") {
+			return nil
+		}
+
+		// Skip schema.yaml and template.yaml
+		if info.Name() == "schema.yaml" || info.Name() == "template.yaml" {
+			return nil
+		}
+
+		// Read and parse the YAML file
+		data, err := os.ReadFile(path)
+		if err != nil {
+			log.Printf("Warning: failed to read %s: %v", path, err)
+			return nil // Continue walking
+		}
+
+		var failureCase FailureCase
+		if err := yaml.Unmarshal(data, &failureCase); err != nil {
+			log.Printf("Warning: failed to parse %s: %v", path, err)
+			return nil // Continue walking
+		}
+
+		// Skip if no category found
+		if failureCase.Category == "" {
+			log.Printf("Warning: no category in %s", path)
+			return nil // Continue walking
+		}
+
+		// Update stats
+		categoryStats[failureCase.Category]++
+
+		// Parse discovered date for timestamps
+		var discoveredTime time.Time
+		if failureCase.Discovered != "" {
+			discoveredTime, err = time.Parse("2006-01-02", failureCase.Discovered)
+			if err != nil {
+				// If parsing fails, use file modification time
+				discoveredTime = info.ModTime()
+			}
+		} else {
+			// Use file modification time if no discovered date
+			discoveredTime = info.ModTime()
+		}
+
+		// Track first and last seen
+		if firstSeen, ok := categoryFirstSeen[failureCase.Category]; !ok || discoveredTime.Before(firstSeen) {
+			categoryFirstSeen[failureCase.Category] = discoveredTime
+		}
+		if lastSeen, ok := categoryLastSeen[failureCase.Category]; !ok || discoveredTime.After(lastSeen) {
+			categoryLastSeen[failureCase.Category] = discoveredTime
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("walking failures directory: %w", err)
+	}
+
+	// Persist stats to database
+	for category, count := range categoryStats {
+		firstSeen := categoryFirstSeen[category]
+		lastSeen := categoryLastSeen[category]
+
+		if err := store.UpsertCategoryStats(category, count, firstSeen, lastSeen); err != nil {
+			return nil, fmt.Errorf("upserting stats for %s: %w", category, err)
+		}
+	}
+
+	return categoryStats, nil
 }
