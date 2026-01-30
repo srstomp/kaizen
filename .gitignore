@@ -40,4 +40,6 @@ results/
 # Test shell scripts (development helpers)
 test_*.sh
 
-docs/plans
+!docs/plans
+docs
+
