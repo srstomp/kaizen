@@ -49,3 +49,5 @@ docs/adr/
 .vscode
 .ohno
 .mcp.json
+
+.DS_Store

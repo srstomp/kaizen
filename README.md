@@ -270,7 +270,6 @@ type CodeGrader interface {
 
 - [User Guide](docs/user-guide.md) - Complete guide to using Kaizen
 - [Dashboard Data Model](docs/dashboard-data-model.md) - Schema for dashboard visualization
-- [Architecture Decisions](docs/adr/) - Key design decisions and rationale
 - [Meta-Evaluation Baseline](meta/BASELINE.md) - Agent performance baselines
 
 ## License
