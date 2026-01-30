@@ -450,4 +450,4 @@ To add new failure categories or improve detection:
 
 For questions or issues:
 - GitHub Issues: https://github.com/srstomp/kaizen/issues
-- See also: [pokayokay integrations](https://github.com/srstomp/pokayokay/docs/integrations/)
+- See also: [pokayokay integrations](https://github.com/srstomp/pokayokay/blob/master/docs/integrations/README.md)
