@@ -42,7 +42,7 @@ test_*.sh
 
 
 # Docs - allow most, ignore specific directories
-docs/plan/
+docs/plans/
 docs/adr/
 
 .idea
