@@ -9,7 +9,8 @@ import (
 
 // Mock executor for testing
 type mockExecExecutor struct {
-	shouldFail    bool
+	lookPathFail  bool
+	executeFail   bool
 	output        string
 	commandCalled []string
 	argsCalled    []string
@@ -18,14 +19,14 @@ type mockExecExecutor struct {
 func (m *mockExecExecutor) Execute(name string, args ...string) ([]byte, error) {
 	m.commandCalled = append(m.commandCalled, name)
 	m.argsCalled = args
-	if m.shouldFail {
+	if m.executeFail {
 		return nil, errors.New("command failed")
 	}
 	return []byte(m.output), nil
 }
 
 func (m *mockExecExecutor) LookPath(name string) (string, error) {
-	if m.shouldFail {
+	if m.lookPathFail {
 		return "", exec.ErrNotFound
 	}
 	return "/usr/local/bin/" + name, nil
@@ -89,7 +90,7 @@ func TestCreateFixTask_Success(t *testing.T) {
 
 func TestCreateFixTask_OhnoNotInstalled(t *testing.T) {
 	mock := &mockExecExecutor{
-		shouldFail: true,
+		lookPathFail: true,
 	}
 
 	client := &OhnoClient{
@@ -115,21 +116,14 @@ func TestCreateFixTask_OhnoNotInstalled(t *testing.T) {
 }
 
 func TestCreateFixTask_CommandFails(t *testing.T) {
+	// LookPath succeeds, but Execute fails
 	mock := &mockExecExecutor{
-		shouldFail: true,
-	}
-
-	// First call to LookPath succeeds, but Execute fails
-	lookPathMock := &mockExecExecutor{
-		output: "/usr/local/bin/ohno",
+		executeFail: true,
 	}
 
 	client := &OhnoClient{
-		executor: lookPathMock,
+		executor: mock,
 	}
-
-	// Override for Execute call
-	client.executor = mock
 
 	params := CreateFixTaskParams{
 		Title:       "Fix: Add tests for task-123",
@@ -142,6 +136,10 @@ func TestCreateFixTask_CommandFails(t *testing.T) {
 	_, err := client.CreateFixTask(params)
 	if err == nil {
 		t.Error("CreateFixTask should fail when command execution fails")
+	}
+
+	if !strings.Contains(err.Error(), "command failed") {
+		t.Errorf("error should mention command failed, got: %v", err)
 	}
 }
 
