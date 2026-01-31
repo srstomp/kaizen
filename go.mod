@@ -1,6 +1,11 @@
 module github.com/srstomp/kaizen
 
-go 1.23.0
+// Security: Require Go 1.25.6+ to include fixes for:
+// - GO-2026-4341: Memory exhaustion in net/url query parsing
+// - GO-2026-4340: TLS handshake encryption level issue
+// - GO-2025-4175: X.509 wildcard DNS constraint bypass
+// - GO-2025-4155: X.509 cert validation resource exhaustion
+go 1.25.6
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.19.0

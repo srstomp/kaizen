@@ -1022,7 +1022,7 @@ func TestValidateEvalConfig(t *testing.T) {
 				},
 			},
 			expectError: true,
-			errorMsg:    "agent name must match pattern ^yokay-[a-z-]+$",
+			errorMsg:    "is not in the approved whitelist",
 		},
 		{
 			name: "Invalid agent name - uppercase",
@@ -1044,7 +1044,7 @@ func TestValidateEvalConfig(t *testing.T) {
 				},
 			},
 			expectError: true,
-			errorMsg:    "agent name must match pattern ^yokay-[a-z-]+$",
+			errorMsg:    "is not in the approved whitelist",
 		},
 		{
 			name: "Missing agent name",

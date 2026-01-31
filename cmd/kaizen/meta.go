@@ -15,6 +15,50 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// approvedAgents is a whitelist of agent names that are allowed to be executed.
+// This prevents command injection attacks by ensuring only known-safe agent names
+// can be passed to the claude CLI.
+// CWE-78: OS Command Injection mitigation
+var approvedAgents = map[string]bool{
+	// Production agents
+	"yokay-brainstormer":     true,
+	"yokay-quality-reviewer": true,
+	"yokay-spec-reviewer":    true,
+	"yokay-task-reviewer":    true,
+	"yokay-implementer":      true,
+	"yokay-explorer":         true,
+	"yokay-test-runner":      true,
+	"yokay-security-scanner": true,
+	"yokay-spike-runner":     true,
+	"yokay-browser-verifier": true,
+	"yokay-auditor":          true,
+	// Test agents (only used in test environment)
+	"yokay-test-agent":       isTestEnvironment(),
+	"yokay-test-agent-alt":   isTestEnvironment(),
+	"yokay-multi-test-agent": isTestEnvironment(),
+	"yokay-test":             isTestEnvironment(),
+}
+
+// isTestEnvironment returns true if running in a test context
+func isTestEnvironment() bool {
+	// Check for common test environment indicators
+	for _, arg := range os.Args {
+		if strings.HasPrefix(arg, "-test.") {
+			return true
+		}
+	}
+	return os.Getenv("GO_TEST") == "1"
+}
+
+// validateAgentName checks if the agent name is in the approved whitelist.
+// Returns an error if the agent is not approved.
+func validateAgentName(agentName string) error {
+	if approved, exists := approvedAgents[agentName]; exists && approved {
+		return nil
+	}
+	return fmt.Errorf("agent %q is not in the approved whitelist; add it to approvedAgents in meta.go if this is a valid agent", agentName)
+}
+
 // EvalConfig represents the structure of an eval.yaml file
 type EvalConfig struct {
 	Agent                string     `yaml:"agent"`
@@ -89,9 +133,10 @@ func ValidateEvalConfig(config *EvalConfig) error {
 	if config.Agent == "" {
 		return fmt.Errorf("agent is required")
 	}
-	agentPattern := regexp.MustCompile(`^yokay-[a-z-]+$`)
-	if !agentPattern.MatchString(config.Agent) {
-		return fmt.Errorf("agent name must match pattern ^yokay-[a-z-]+$, got: %s", config.Agent)
+	// Security: Use whitelist validation instead of regex to prevent command injection
+	// CWE-78: OS Command Injection mitigation
+	if err := validateAgentName(config.Agent); err != nil {
+		return err
 	}
 
 	// Validate consistency threshold
@@ -310,6 +355,12 @@ func extractVerdict(output string) string {
 
 // executeAgent executes an agent via Claude CLI and returns the verdict
 func executeAgent(agentName string, input TaskInput) (string, error) {
+	// Security: Validate agent name against whitelist before execution
+	// CWE-78: OS Command Injection mitigation
+	if err := validateAgentName(agentName); err != nil {
+		return "ERROR", err
+	}
+
 	// Format the prompt
 	prompt := formatAgentPrompt(agentName, input)
 
@@ -330,8 +381,10 @@ func executeAgent(agentName string, input TaskInput) (string, error) {
 		if ctx.Err() == context.DeadlineExceeded {
 			return "ERROR", fmt.Errorf("agent execution timed out after 5 minutes")
 		}
-		// Return ERROR verdict with message for other failures
-		return "ERROR", fmt.Errorf("agent execution failed: %w (output: %s)", err, string(output))
+		// Security: Sanitize error messages to prevent information leakage
+		// CWE-209: Information Exposure Through Error Messages mitigation
+		// Only include exit code, not full output which may contain sensitive info
+		return "ERROR", fmt.Errorf("agent execution failed: %w (exit status in error)", err)
 	}
 
 	// Extract verdict from output
